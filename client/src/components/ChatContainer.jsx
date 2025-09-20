@@ -89,12 +89,14 @@ const ChatContainer = ({ selectedUser, setSelectedUser }) => {
             accept="image/png, image/jpeg"
             hidden
           />
-          <label htmlFor="image" />
-          <img
+         <label htmlFor="image">
+           <img
             src={assets.gallery_icon}
             alt=""
             className="w-5 mr-2 cursor-pointer"
           />
+         </label>
+         
         </div>
         <img src={assets.send_button} alt=" w-7 cursor-pointer" />
       </div>
