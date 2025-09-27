@@ -12,7 +12,7 @@ export const signup = async (req, res) => {
     if (!fullName || !email || !password || !bio) {
       return res.json({ success: false, message: "Missing Details" });
     }
-    const user = await User.findOne({ email });
+    const user = await User.findOne({email});
 
     if (user) {
       return res.json({ success: false, Message: "Account already exists" });
@@ -22,7 +22,7 @@ export const signup = async (req, res) => {
     const hashedPassword = await bcrypt.hash(password, salt);
     const newUser = await User.create({
       fullName,
-      email,
+      email, 
       password: hashedPassword,
       bio,
     });
@@ -65,7 +65,7 @@ export const login = async (req, res) => {
 // Controller to check if user is authenticated
 
 export const checkAuth = (req, res) => {
-  res.json({ success: true });
+  res.json({ success: true, user:req.user});
 };
 
 // Controller to update user profile details
