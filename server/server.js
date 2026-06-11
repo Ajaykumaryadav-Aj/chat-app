@@ -5,9 +5,8 @@ import http from "http";
 import { connectDB } from "./lib/db.js";
 import userRouter from "./routes/userRoutes.js";
 import messageRouter from "./routes/messageRoutes.js";
+import aiRouter from "./routes/aiRoutes.js";
 import { Server } from "socket.io";
-import { Socket } from "dgram";
-import { log } from "console";
 
 // Create Express app and http server
 const app = express();
@@ -52,6 +51,7 @@ app.use(cors());
 app.use("/api/status", (req, res)=> res.send("Server is Live"));
 app.use("/api/auth", userRouter);
 app.use("/api/messages", messageRouter);
+app.use("/api/ai", aiRouter);
 
 // Connect to MongoDB
 await connectDB();
