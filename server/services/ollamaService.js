@@ -9,6 +9,15 @@ const getBaseUrl = () =>
 
 const getTextModel = () => process.env.OLLAMA_MODEL || DEFAULT_MODEL;
 const getKeepAlive = () => process.env.OLLAMA_KEEP_ALIVE || DEFAULT_KEEP_ALIVE;
+const getHeaders = () => {
+  const headers = { "Content-Type": "application/json" };
+
+  if (process.env.OLLAMA_API_KEY) {
+    headers.Authorization = `Bearer ${process.env.OLLAMA_API_KEY}`;
+  }
+
+  return headers;
+};
 
 const getConnectionErrorMessage = () =>
   `Cannot connect to Ollama at ${getBaseUrl()}. Start Ollama with "ollama serve" and pull the configured model with "ollama pull ${getTextModel()}".`;
@@ -41,7 +50,7 @@ const requestOllama = async (path, body, timeoutMs) => {
     (signal) =>
       fetch(`${getBaseUrl()}${path}`, {
         method: "POST",
-        headers: { "Content-Type": "application/json" },
+        headers: getHeaders(),
         body: JSON.stringify(body),
         signal,
       }),
@@ -86,7 +95,10 @@ export const generateText = async ({
 
 export const listModels = async () => {
   const response = await withTimeout((signal) =>
-    fetch(`${getBaseUrl()}/api/tags`, { signal })
+    fetch(`${getBaseUrl()}/api/tags`, {
+      headers: getHeaders(),
+      signal,
+    })
   );
 
   if (!response.ok) {
