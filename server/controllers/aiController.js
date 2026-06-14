@@ -3,8 +3,9 @@ import {
   generateFromImage,
   generateText,
   getAvailableVisionModel,
+  getGeminiTimeoutMs,
   imageUrlToBase64,
-} from "../services/ollamaService.js";
+} from "../services/geminiService.js";
 
 const VALID_REWRITE_TONES = new Set([
   "Professional",
@@ -85,7 +86,7 @@ export const getSmartReplies = async (req, res) => {
         temperature: 0.25,
         num_predict: 90,
       },
-      timeoutMs: 30000,
+      timeoutMs: getGeminiTimeoutMs(),
     });
 
     const suggestions = parseReplySuggestions(rawText).slice(0, 3);
@@ -117,7 +118,7 @@ export const rewriteMessage = async (req, res) => {
         temperature: 0.2,
         num_predict: 120,
       },
-      timeoutMs: 30000,
+      timeoutMs: getGeminiTimeoutMs(),
     });
 
     res.json({ success: true, rewrittenText });
@@ -147,7 +148,7 @@ export const summarizeChat = async (req, res) => {
         temperature: 0.25,
         num_predict: 260,
       },
-      timeoutMs: 60000,
+      timeoutMs: getGeminiTimeoutMs(),
     });
 
     res.json({ success: true, summary });
@@ -188,14 +189,15 @@ export const analyzeImage = async (req, res) => {
     if (!model) {
       return res.status(409).json({
         success: false,
-        message: "No Ollama vision model found. Install llava or llama3.2-vision.",
+        message: "Gemini image analysis is unavailable.",
       });
     }
 
-    const imageBase64 = await imageUrlToBase64(message.image);
+    const imageData = await imageUrlToBase64(message.image);
     const analysis = await generateFromImage({
       model,
-      imageBase64,
+      imageBase64: imageData.data,
+      mimeType: imageData.mimeType,
       prompt:
         "Describe the image content, extract visible text if possible, and return a concise summary.",
     });

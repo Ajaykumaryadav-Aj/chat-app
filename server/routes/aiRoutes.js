@@ -41,6 +41,14 @@ const aiRateLimiter = (req, res, next) => {
   next();
 };
 
+aiRouter.get("/health", (req, res) => {
+  res.json({
+    success: true,
+    provider: "gemini",
+    model: process.env.GEMINI_MODEL || "gemini-3.5-flash",
+  });
+});
+
 aiRouter.use(protectRoute, aiRequestLogger, aiRateLimiter);
 
 aiRouter.post("/smart-replies", getSmartReplies);
