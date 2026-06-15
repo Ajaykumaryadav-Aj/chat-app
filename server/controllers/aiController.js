@@ -41,9 +41,20 @@ const formatConversation = (messages, currentUserId) =>
     })
     .join("\n");
 
+const stripOuterQuotes = (value) =>
+  String(value || "")
+    .trim()
+    .replace(/^["']|["']$/g, "")
+    .trim();
+
+const trimToWordLimit = (value, limit) => {
+  const words = stripOuterQuotes(value).split(/\s+/).filter(Boolean);
+  return words.slice(0, limit).join(" ");
+};
+
 const parseReplySuggestions = (rawText) => {
   const cleaned = rawText
-    .replace(/```json|```/g, "")
+    .replace(/```json|```/gi, "")
     .trim();
 
   try {
@@ -51,7 +62,7 @@ const parseReplySuggestions = (rawText) => {
     const suggestions = Array.isArray(parsed) ? parsed : parsed.suggestions;
     if (Array.isArray(suggestions)) {
       return suggestions
-        .map((item) => String(item).replace(/^[-\d.\s"]+|["]+$/g, "").trim())
+        .map((item) => trimToWordLimit(item, 15))
         .filter(Boolean)
         .slice(0, 3);
     }
@@ -61,9 +72,26 @@ const parseReplySuggestions = (rawText) => {
 
   return cleaned
     .split(/\r?\n/)
-    .map((line) => line.replace(/^[-\d.\s"]+|["]+$/g, "").trim())
+    .map((line) => line.replace(/^[-\d.\s"]+|["]+$/g, ""))
+    .map((line) => trimToWordLimit(line, 15))
     .filter(Boolean)
     .slice(0, 3);
+};
+
+const ensureThreeSuggestions = (suggestions) => {
+  const fallbackSuggestions = [
+    "Sounds good, tell me more.",
+    "Okay, I will check.",
+    "Thanks for sharing this.",
+  ];
+  const uniqueSuggestions = [...new Set(suggestions.map((item) => trimToWordLimit(item, 15)))];
+
+  for (const fallback of fallbackSuggestions) {
+    if (uniqueSuggestions.length >= 3) break;
+    uniqueSuggestions.push(fallback);
+  }
+
+  return uniqueSuggestions.slice(0, 3);
 };
 
 export const getSmartReplies = async (req, res) => {
@@ -73,12 +101,12 @@ export const getSmartReplies = async (req, res) => {
       return res.status(400).json({ success: false, message: "Valid selectedUserId is required" });
     }
 
-    const messages = await getRecentConversationMessages(req.user._id, selectedUserId, 20);
+    const messages = await getRecentConversationMessages(req.user._id, selectedUserId, 12);
     if (!messages.length) {
       return res.json({ success: true, suggestions: [] });
     }
 
-    const prompt = `Conversation:\n${formatConversation(messages, req.user._id)}\n\nGenerate exactly 3 natural, context-aware reply suggestions for Me. Each suggestion must be under 15 words. Return only JSON like {"suggestions":["...","...","..."]}.`;
+    const prompt = `Conversation:\n${formatConversation(messages, req.user._id)}\n\nGenerate exactly 3 natural, context-aware reply suggestions for Me. Each suggestion must be under 15 words. Return only minified JSON in this shape: {"suggestions":["reply 1","reply 2","reply 3"]}`;
     const rawText = await generateText({
       system: "You write concise chat reply suggestions. Return valid JSON only.",
       prompt,
@@ -89,7 +117,7 @@ export const getSmartReplies = async (req, res) => {
       timeoutMs: getGeminiTimeoutMs(),
     });
 
-    const suggestions = parseReplySuggestions(rawText).slice(0, 3);
+    const suggestions = ensureThreeSuggestions(parseReplySuggestions(rawText));
     res.json({ success: true, suggestions });
   } catch (error) {
     console.error("AI smart reply error:", error.message);
@@ -121,7 +149,7 @@ export const rewriteMessage = async (req, res) => {
       timeoutMs: getGeminiTimeoutMs(),
     });
 
-    res.json({ success: true, rewrittenText });
+    res.json({ success: true, rewrittenText: stripOuterQuotes(rewrittenText) });
   } catch (error) {
     console.error("AI rewrite error:", error.message);
     res.status(500).json({ success: false, message: error.message });

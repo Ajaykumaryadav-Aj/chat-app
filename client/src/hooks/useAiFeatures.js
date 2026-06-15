@@ -47,7 +47,11 @@ const useAiFeatures = (selectedUserId) => {
     const data = await runAiAction("smartReplies", () =>
       getSmartReplies(axios, selectedUserId)
     );
-    if (data?.success) setSmartReplies(data.suggestions || []);
+    if (data?.success) {
+      const suggestions = data.suggestions || [];
+      setSmartReplies(suggestions);
+      if (!suggestions.length) toast.error("No smart replies available yet");
+    }
   }, [axios, runAiAction, selectedUserId]);
 
   const rewriteInput = useCallback(async (text, tone) => {

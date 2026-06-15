@@ -78,7 +78,7 @@ export const ChatProvider = ({ children }) => {
 
   // function to unsubscribe from messages
   const unsubscribeFromMessages = () => {
-    if (socket) socket.off("newMessages");
+    if (socket) socket.off("newMessage");
   };
 
   useEffect(() => {

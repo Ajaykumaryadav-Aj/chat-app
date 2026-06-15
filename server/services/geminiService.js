@@ -2,7 +2,9 @@ const DEFAULT_MODEL = "gemini-3.5-flash";
 const DEFAULT_TIMEOUT_MS = 60000;
 const GEMINI_BASE_URL = "https://generativelanguage.googleapis.com/v1beta";
 
-const getModel = () => process.env.GEMINI_MODEL || DEFAULT_MODEL;
+const getModel = () => (process.env.GEMINI_MODEL || DEFAULT_MODEL).trim();
+const getApiKey = () => (process.env.GEMINI_API_KEY || "").trim();
+
 export const getGeminiTimeoutMs = () =>
   Number(process.env.GEMINI_TIMEOUT_MS || process.env.AI_TIMEOUT_MS) || DEFAULT_TIMEOUT_MS;
 
@@ -23,7 +25,9 @@ const withTimeout = async (callback, timeoutMs = getGeminiTimeoutMs()) => {
 };
 
 const requestGemini = async ({ parts, system, options = {}, timeoutMs }) => {
-  if (!process.env.GEMINI_API_KEY) {
+  const apiKey = getApiKey();
+
+  if (!apiKey) {
     throw new Error("GEMINI_API_KEY is required");
   }
 
@@ -34,10 +38,10 @@ const requestGemini = async ({ parts, system, options = {}, timeoutMs }) => {
         method: "POST",
         headers: {
           "Content-Type": "application/json",
-          "x-goog-api-key": process.env.GEMINI_API_KEY,
+          "x-goog-api-key": apiKey,
         },
         body: JSON.stringify({
-          systemInstruction: system
+          system_instruction: system
             ? {
                 parts: [{ text: system }],
               }
@@ -48,9 +52,9 @@ const requestGemini = async ({ parts, system, options = {}, timeoutMs }) => {
               parts,
             },
           ],
-          generationConfig: {
+          generation_config: {
             temperature: options.temperature ?? 0.3,
-            maxOutputTokens:
+            max_output_tokens:
               options.maxOutputTokens || options.num_predict || options.max_tokens || 180,
           },
         }),
@@ -70,6 +74,10 @@ const requestGemini = async ({ parts, system, options = {}, timeoutMs }) => {
         throw new Error("Gemini API key is invalid. Create a valid key in Google AI Studio and update GEMINI_API_KEY.");
       }
 
+      if (message.toLowerCase().includes("not found")) {
+        throw new Error(`Gemini model "${getModel()}" is not available for this API key.`);
+      }
+
       throw new Error(`Gemini error (${response.status}): ${message}`);
     } catch (error) {
       if (error.message.startsWith("Gemini")) throw error;
@@ -78,12 +86,19 @@ const requestGemini = async ({ parts, system, options = {}, timeoutMs }) => {
   }
 
   const data = await response.json();
-  return (
-    data.candidates?.[0]?.content?.parts
+  const text = data.candidates?.[0]?.content?.parts
       ?.map((part) => part.text || "")
       .join("")
-      .trim() || ""
-  );
+      .trim() || "";
+
+  if (!text) {
+    const finishReason = data.candidates?.[0]?.finishReason;
+    const blockReason = data.promptFeedback?.blockReason;
+    const reason = blockReason || finishReason || "empty response";
+    throw new Error(`Gemini returned no text (${reason}).`);
+  }
+
+  return text;
 };
 
 export const generateText = ({ prompt, system, options, timeoutMs }) =>
@@ -126,8 +141,8 @@ export const generateFromImage = ({
     parts: [
       { text: prompt },
       {
-        inlineData: {
-          mimeType,
+        inline_data: {
+          mime_type: mimeType,
           data: imageBase64,
         },
       },
