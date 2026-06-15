@@ -61,7 +61,20 @@ const requestGemini = async ({ parts, system, options = {}, timeoutMs }) => {
 
   if (!response.ok) {
     const details = await response.text();
-    throw new Error(`Gemini error (${response.status}): ${details}`);
+    try {
+      const parsed = JSON.parse(details);
+      const reason = parsed.error?.details?.find((detail) => detail.reason)?.reason;
+      const message = parsed.error?.message || details;
+
+      if (reason === "API_KEY_INVALID") {
+        throw new Error("Gemini API key is invalid. Create a valid key in Google AI Studio and update GEMINI_API_KEY.");
+      }
+
+      throw new Error(`Gemini error (${response.status}): ${message}`);
+    } catch (error) {
+      if (error.message.startsWith("Gemini")) throw error;
+      throw new Error(`Gemini error (${response.status}): ${details}`);
+    }
   }
 
   const data = await response.json();
