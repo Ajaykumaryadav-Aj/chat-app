@@ -3,28 +3,41 @@ import User from "../models/User.js";
 import bcrypt from "bcryptjs";
 import cloudinary from "../lib/cloudinary.js";
 
+const escapeRegex = (value) => value.replace(/[.*+?^${}()|[\]\\]/g, "\\$&");
+
+const findUserByEmail = (email) =>
+  User.findOne({
+    email: { $regex: `^${escapeRegex(email)}$`, $options: "i" },
+  });
+
 // Signup a new user
 
 export const signup = async (req, res) => {
   const { fullName, email, password, bio } = req.body;
+  const normalizedEmail = email?.trim().toLowerCase();
 
   try {
     if (!fullName || !email || !password || !bio) {
-      return res.json({ success: false, message: "Missing Details" });
+      return res.status(400).json({ success: false, message: "Missing details" });
     }
-    const user = await User.findOne({email});
+
+    if (password.length < 6) {
+      return res.status(400).json({ success: false, message: "Password must be at least 6 characters" });
+    }
+
+    const user = await findUserByEmail(normalizedEmail);
 
     if (user) {
-      return res.json({ success: false, Message: "Account already exists" });
+      return res.status(409).json({ success: false, message: "Account already exists" });
     }
 
     const salt = await bcrypt.genSalt(10);
     const hashedPassword = await bcrypt.hash(password, salt);
     const newUser = await User.create({
-      fullName,
-      email, 
+      fullName: fullName.trim(),
+      email: normalizedEmail, 
       password: hashedPassword,
-      bio,
+      bio: bio.trim(),
     });
     const token = generateToken(newUser._id);
 
@@ -45,12 +58,22 @@ export const signup = async (req, res) => {
 export const login = async (req, res) => {
   try {
     const { email, password } = req.body;
-    const userData = await User.findOne({ email });
+    const normalizedEmail = email?.trim().toLowerCase();
+
+    if (!normalizedEmail || !password) {
+      return res.status(400).json({ success: false, message: "Email and password are required" });
+    }
+
+    const userData = await findUserByEmail(normalizedEmail);
+
+    if (!userData) {
+      return res.status(401).json({ success: false, message: "Invalid credentials" });
+    }
 
     const isPasswordCorrect = await bcrypt.compare(password, userData.password);
 
     if (!isPasswordCorrect) {
-      return res.json({ success: false, message: "Invalid creadentials " });
+      return res.status(401).json({ success: false, message: "Invalid credentials" });
     }
 
     const token = generateToken(userData._id);

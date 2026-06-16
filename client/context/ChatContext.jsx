@@ -9,10 +9,10 @@ export const ChatProvider = ({ children }) => {
   const [users, setUsers] = useState([]);
   const [selectedUser, setSelectedUser] = useState(null);
   const [unseenMessages, setUnseenMessages] = useState({});
+  const [firstUnreadMessageId, setFirstUnreadMessageId] = useState(null);
 
   const { socket, axios } = useContext(AuthContext);
 
-  // function to get users for sidebar
   const getUsers = async () => {
     try {
       const { data } = await axios.get("/api/messages/users");
@@ -21,24 +21,31 @@ export const ChatProvider = ({ children }) => {
         setUnseenMessages(data.unseenMessages);
       }
     } catch (error) {
-      toast.error(error.message);
+      toast.error(error.response?.data?.message || error.message);
     }
   };
-
-  // function to get message for selected user
 
   const getMessages = async (userId) => {
     try {
       const { data } = await axios.get(`/api/messages/${userId}`);
       if (data.success) {
         setMessages(data.messages);
+        setFirstUnreadMessageId(data.firstUnreadMessageId || null);
       }
     } catch (error) {
-      toast.error(error.message);
+      toast.error(error.response?.data?.message || error.message);
     }
   };
 
-  //// function to send message to selected user
+  const updateMessageInState = (updatedMessage) => {
+    setMessages((prevMessages) =>
+      prevMessages
+        .map((message) =>
+          message._id === updatedMessage._id ? updatedMessage : message
+        )
+        .filter((message) => !message.deletedForEveryone)
+    );
+  };
 
   const sendMessage = async (messageData) => {
     try {
@@ -52,11 +59,65 @@ export const ChatProvider = ({ children }) => {
         toast.error(data.message);
       }
     } catch (error) {
-      toast.error(error.message);
+      toast.error(error.response?.data?.message || error.message);
     }
   };
 
-  // function to subscribe to message for selected user
+  const editMessage = async (messageId, text) => {
+    try {
+      const { data } = await axios.put(`/api/messages/edit/${messageId}`, {
+        text,
+      });
+      if (data.success) updateMessageInState(data.message);
+      else toast.error(data.message);
+    } catch (error) {
+      toast.error(error.response?.data?.message || error.message);
+    }
+  };
+
+  const deleteMessage = async (messageId, mode = "me") => {
+    try {
+      const { data } = await axios.put(`/api/messages/delete/${messageId}`, {
+        mode,
+      });
+      if (data.success) {
+        if (mode === "me") {
+          setMessages((prevMessages) =>
+            prevMessages.filter((message) => message._id !== messageId)
+          );
+        } else {
+          updateMessageInState(data.message);
+        }
+      } else {
+        toast.error(data.message);
+      }
+    } catch (error) {
+      toast.error(error.response?.data?.message || error.message);
+    }
+  };
+
+  const reactToMessage = async (messageId, emoji) => {
+    try {
+      const { data } = await axios.put(`/api/messages/react/${messageId}`, {
+        emoji,
+      });
+      if (data.success) updateMessageInState(data.message);
+      else toast.error(data.message);
+    } catch (error) {
+      toast.error(error.response?.data?.message || error.message);
+    }
+  };
+
+  const togglePinMessage = async (messageId) => {
+    try {
+      const { data } = await axios.put(`/api/messages/pin/${messageId}`);
+      if (data.success) updateMessageInState(data.message);
+      else toast.error(data.message);
+    } catch (error) {
+      toast.error(error.response?.data?.message || error.message);
+    }
+  };
+
   const subscribeToMessages = async () => {
     if (!socket) return;
 
@@ -70,15 +131,31 @@ export const ChatProvider = ({ children }) => {
           ...prevUnseenMessages,
           [newMessage.senderId]: prevUnseenMessages[newMessage.senderId]
             ? prevUnseenMessages[newMessage.senderId] + 1
-            : 1
+            : 1,
         }));
       }
     });
+
+    socket.on("messageUpdated", (updatedMessage) => {
+      updateMessageInState(updatedMessage);
+    });
+
+    socket.on("messagesSeen", ({ seenBy, seenAt }) => {
+      setMessages((prevMessages) =>
+        prevMessages.map((message) =>
+          message.receiverId === seenBy
+            ? { ...message, seen: true, seenAt }
+            : message
+        )
+      );
+    });
   };
 
-  // function to unsubscribe from messages
   const unsubscribeFromMessages = () => {
-    if (socket) socket.off("newMessage");
+    if (!socket) return;
+    socket.off("newMessage");
+    socket.off("messageUpdated");
+    socket.off("messagesSeen");
   };
 
   useEffect(() => {
@@ -93,10 +170,16 @@ export const ChatProvider = ({ children }) => {
     getUsers,
     setMessages,
     sendMessage,
+    editMessage,
+    deleteMessage,
+    reactToMessage,
+    togglePinMessage,
     setSelectedUser,
     unseenMessages,
     setUnseenMessages,
-    getMessages
+    getMessages,
+    firstUnreadMessageId,
+    setFirstUnreadMessageId,
   };
 
   return <ChatContext.Provider value={value}>{children}</ChatContext.Provider>;

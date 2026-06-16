@@ -22,11 +22,13 @@ export const AuthProvider = ({ children }) => {
       if (data.success) {
         setAuthUser(data.user);
         connectSocket(data.user);
+      } else {
+        logout(false);
       }
     } catch (error) {
       toast.error(error.message);
       console.log(error.message);
-      logout();
+      logout(false);
       
     }
   };
@@ -46,20 +48,21 @@ export const AuthProvider = ({ children }) => {
         toast.error(data.message);
       }
     } catch (error) {
-      toast.error(error.message);
+      toast.error(error.response?.data?.message || error.message);
     }
   };
 
   // Logout function to handle user logout and socket disconnection
 
-  const logout = async () => {
+  const logout = async (showMessage = true) => {
     localStorage.removeItem("token");
     setToken(null);
     setAuthUser(null);
     setOnlineUsers([]);
     axios.defaults.headers.common["token"] = null;
-    toast.success("Logged out successfully");
-    socket.disconnect();
+    if (showMessage) toast.success("Logged out successfully");
+    socket?.disconnect();
+    setSocket(null);
   };
 
   // Update profile function to handle user profile updates
@@ -71,7 +74,7 @@ export const AuthProvider = ({ children }) => {
         toast.success("Profile updated succesfully");
       }
     } catch (error) {
-      toast.error(error.message);
+      toast.error(error.response?.data?.message || error.message);
     }
   };
 

@@ -5,6 +5,7 @@ import http from "http";
 import { connectDB } from "./lib/db.js";
 import userRouter from "./routes/userRoutes.js";
 import messageRouter from "./routes/messageRoutes.js";
+import User from "./models/User.js";
 import { Server } from "socket.io";
 
 // Create Express app and http server
@@ -31,8 +32,25 @@ io.on("connection", (socket)=>{
     // Emit online users to all connnected clients
     io.emit("getOnlineUsers", Object.keys(userSocketMap));
 
-    socket.on("disconnect", ()=>{
+    socket.on("typing:start", ({ receiverId }) => {
+        const receiverSocketId = userSocketMap[receiverId];
+        if (receiverSocketId && userId) {
+            io.to(receiverSocketId).emit("typing:start", { senderId: userId });
+        }
+    });
+
+    socket.on("typing:stop", ({ receiverId }) => {
+        const receiverSocketId = userSocketMap[receiverId];
+        if (receiverSocketId && userId) {
+            io.to(receiverSocketId).emit("typing:stop", { senderId: userId });
+        }
+    });
+
+    socket.on("disconnect", async ()=>{
         console.log("User Disconnected", userId);
+        if (userId) {
+            await User.findByIdAndUpdate(userId, { lastSeen: new Date() });
+        }
         delete userSocketMap[userId];
         io.emit("getOnlineUsers", Object.keys(userSocketMap))
     })
