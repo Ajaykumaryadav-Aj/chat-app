@@ -28,6 +28,7 @@ const ChatContainer = () => {
   const [searchTerm, setSearchTerm] = useState("");
   const [replyTo, setReplyTo] = useState(null);
   const [typingUserIds, setTypingUserIds] = useState([]);
+  const [openMenuId, setOpenMenuId] = useState(null);
   const typingTimeout = useRef(null);
   const scrollEnd = useRef();
 
@@ -63,6 +64,12 @@ const ChatContainer = () => {
       socket.off("typing:stop", handleTypingStop);
     };
   }, [socket]);
+
+  useEffect(() => {
+    const closeMenu = () => setOpenMenuId(null);
+    window.addEventListener("click", closeMenu);
+    return () => window.removeEventListener("click", closeMenu);
+  }, []);
 
   const pinnedMessages = useMemo(
     () => messages.filter((msg) => msg.pinned && !msg.deletedForEveryone),
@@ -155,6 +162,12 @@ const ChatContainer = () => {
     if (nextText === null) return;
     if (!nextText.trim()) return toast.error("Message cannot be empty");
     editMessage(msg._id, nextText.trim());
+    setOpenMenuId(null);
+  };
+
+  const handleMenuAction = (action) => {
+    action();
+    setOpenMenuId(null);
   };
 
   const getMessageStatus = (msg) => {
@@ -245,7 +258,7 @@ const ChatContainer = () => {
                 id={`msg-${msg._id}`}
                 className={`group flex items-end gap-2 justify-end ${!isMine && "flex flex-row-reverse"}`}
               >
-                <div className={`mb-8 max-w-[240px] ${isMine ? "items-end" : "items-start"} flex flex-col`}>
+                <div className={`mb-8 max-w-[240px] ${isMine ? "items-end" : "items-start"} flex flex-col relative`}>
                   {msg.replyTo?.messageId && (
                     <button
                       onClick={() => document.getElementById(`msg-${msg.replyTo.messageId}`)?.scrollIntoView({ behavior: "smooth" })}
@@ -278,23 +291,53 @@ const ChatContainer = () => {
                     </div>
                   )}
 
-                  <div className="mt-1 flex flex-wrap gap-1 opacity-100 md:opacity-0 md:group-hover:opacity-100 transition-opacity">
-                    <button onClick={() => setReplyTo(msg)} className="text-[10px] text-white bg-white/10 px-2 py-1 rounded">Reply</button>
-                    <button onClick={() => togglePinMessage(msg._id)} className="text-[10px] text-white bg-white/10 px-2 py-1 rounded">
-                      {msg.pinned ? "Unpin" : "Pin"}
+                  <div className={`absolute top-0 ${isMine ? "-left-8" : "-right-8"}`}>
+                    <button
+                      onClick={(e) => {
+                        e.stopPropagation();
+                        setOpenMenuId((currentId) => (currentId === msg._id ? null : msg._id));
+                      }}
+                      className="w-7 h-7 rounded-full bg-black/25 hover:bg-black/45 text-white opacity-100 md:opacity-0 md:group-hover:opacity-100 transition-opacity"
+                      aria-label="Message options"
+                    >
+                      ...
                     </button>
-                    {isMine && !msg.image && (
-                      <button onClick={() => handleEditMessage(msg)} className="text-[10px] text-white bg-white/10 px-2 py-1 rounded">Edit</button>
+
+                    {openMenuId === msg._id && (
+                      <div
+                        onClick={(e) => e.stopPropagation()}
+                        className={`absolute top-8 z-20 w-40 rounded-lg border border-white/10 bg-[#171225] shadow-xl overflow-hidden ${
+                          isMine ? "right-0" : "left-0"
+                        }`}
+                      >
+                        <button onClick={() => handleMenuAction(() => setReplyTo(msg))} className="w-full text-left text-xs text-white hover:bg-white/10 px-3 py-2">
+                          Reply
+                        </button>
+                        <button onClick={() => handleMenuAction(() => togglePinMessage(msg._id))} className="w-full text-left text-xs text-white hover:bg-white/10 px-3 py-2">
+                          {msg.pinned ? "Unpin" : "Pin"}
+                        </button>
+                        {isMine && !msg.image && (
+                          <button onClick={() => handleEditMessage(msg)} className="w-full text-left text-xs text-white hover:bg-white/10 px-3 py-2">
+                            Edit
+                          </button>
+                        )}
+                        <button onClick={() => handleMenuAction(() => deleteMessage(msg._id, "me"))} className="w-full text-left text-xs text-white hover:bg-white/10 px-3 py-2">
+                          Delete for me
+                        </button>
+                        {isMine && (
+                          <button onClick={() => handleMenuAction(() => deleteMessage(msg._id, "everyone"))} className="w-full text-left text-xs text-red-200 hover:bg-red-500/15 px-3 py-2">
+                            Delete for all
+                          </button>
+                        )}
+                        <div className="flex items-center gap-1 border-t border-white/10 px-2 py-2">
+                          {REACTION_EMOJIS.map((emoji) => (
+                            <button key={emoji} onClick={() => handleMenuAction(() => reactToMessage(msg._id, emoji))} className="flex-1 rounded hover:bg-white/10 text-sm py-1">
+                              {emoji}
+                            </button>
+                          ))}
+                        </div>
+                      </div>
                     )}
-                    <button onClick={() => deleteMessage(msg._id, "me")} className="text-[10px] text-white bg-white/10 px-2 py-1 rounded">Delete me</button>
-                    {isMine && (
-                      <button onClick={() => deleteMessage(msg._id, "everyone")} className="text-[10px] text-red-100 bg-red-500/20 px-2 py-1 rounded">Delete all</button>
-                    )}
-                    {REACTION_EMOJIS.map((emoji) => (
-                      <button key={emoji} onClick={() => reactToMessage(msg._id, emoji)} className="text-[10px] bg-white/10 px-2 py-1 rounded">
-                        {emoji}
-                      </button>
-                    ))}
                   </div>
                 </div>
 

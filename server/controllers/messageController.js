@@ -19,6 +19,8 @@ export const getUsersForSidebar = async (req, res) => {
         senderId: user._id,
         receiverId: userId,
         seen: false,
+        deletedForEveryone: { $ne: true },
+        deletedFor: { $ne: userId },
       });
       if (message.length > 0) {
         unseenMessages[user._id] = message.length;
@@ -42,23 +44,26 @@ export const getMessage = async (req, res) =>{
     try {
        const { id: selectedUserId } = req.params;
        const myId = req.user._id;
-       const firstUnreadMessage = await Message.findOne({
-        senderId: selectedUserId,
-        receiverId: myId,
-        seen: false,
-        deletedForEveryone: false,
-        deletedFor: { $ne: myId },
-       }).sort({ createdAt: 1 }).select("_id");
-
-       const messages = await Message.find({
+       const conversationMessages = await Message.find({
         $or:[
             {senderId:myId, receiverId: selectedUserId},
             {senderId:selectedUserId, receiverId: myId},
         ],
-        deletedForEveryone: false,
-        deletedFor: { $ne: myId },
-
        }).sort({ createdAt: 1 });
+
+       const messages = conversationMessages.filter((message) => {
+        const deletedForMe = message.deletedFor?.some(
+            (deletedUserId) => deletedUserId.toString() === myId.toString()
+        );
+        return message.deletedForEveryone !== true && !deletedForMe;
+       });
+
+       const firstUnreadMessage = messages.find(
+        (message) =>
+            message.senderId.toString() === selectedUserId &&
+            message.receiverId.toString() === myId.toString() &&
+            !message.seen
+       );
 const seenAt = new Date();
 const seenUpdate = await Message.updateMany(
   {senderId: selectedUserId, receiverId:myId, seen:false},
@@ -117,7 +122,7 @@ export const sendMessage = async (req, res) =>{
                     {senderId, receiverId},
                     {senderId: receiverId, receiverId: senderId},
                 ],
-                deletedForEveryone: false,
+                deletedForEveryone: { $ne: true },
             });
             if (replyMessage) {
                 replySnapshot = {
@@ -163,7 +168,12 @@ export const editMessage = async (req, res) => {
         }
 
         const message = await Message.findOneAndUpdate(
-            { _id: id, senderId: userId, image: { $exists: false }, deletedForEveryone: false },
+            {
+                _id: id,
+                senderId: userId,
+                deletedForEveryone: { $ne: true },
+                $or: [{ image: { $exists: false } }, { image: "" }, { image: null }],
+            },
             { text: text.trim(), edited: true, editedAt: new Date() },
             { new: true }
         );
@@ -206,8 +216,11 @@ export const deleteMessage = async (req, res) => {
             message.deletedForEveryone = true;
             message.text = "";
             message.image = "";
-        } else if (!message.deletedFor.some((id) => id.toString() === userId.toString())) {
+        } else {
+            if (!Array.isArray(message.deletedFor)) message.deletedFor = [];
+            if (!message.deletedFor.some((id) => id.toString() === userId.toString())) {
             message.deletedFor.push(userId);
+            }
         }
 
         await message.save();
@@ -232,7 +245,7 @@ export const toggleReaction = async (req, res) => {
 
         const message = await Message.findOne({
             _id: id,
-            deletedForEveryone: false,
+            deletedForEveryone: { $ne: true },
             $or: [{ senderId: userId }, { receiverId: userId }],
         });
 
@@ -267,7 +280,7 @@ export const togglePinMessage = async (req, res) => {
         const userId = req.user._id;
         const message = await Message.findOne({
             _id: id,
-            deletedForEveryone: false,
+            deletedForEveryone: { $ne: true },
             $or: [{ senderId: userId }, { receiverId: userId }],
         });
 
