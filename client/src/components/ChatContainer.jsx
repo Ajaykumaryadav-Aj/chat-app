@@ -186,33 +186,48 @@ const ChatContainer = () => {
   };
 
   const messagePreview = (msg) => msg?.text || (msg?.image ? "Image" : "Message");
+  const isSelectedUserOnline = selectedUser && onlineUsers.includes(selectedUser._id);
 
   return selectedUser ? (
     <div className="h-full overflow-scroll relative backdrop-blur-lg">
-      <div className="flex items-center gap-3 py-3 mx-4 border-b border-stone-500">
-        <img src={selectedUser.profilePic || assets.avatar_icon} alt="" className="w-8 rounded-full" />
+      <div className="flex items-center gap-2 sm:gap-3 py-3 mx-3 sm:mx-4 border-b border-stone-500">
+        <button
+          onClick={() => setSelectedUser(null)}
+          className="md:hidden w-9 h-9 flex items-center justify-center rounded-full bg-white/10 active:bg-white/20"
+          aria-label="Back to chats"
+        >
+          <img src={assets.arrow_icon} alt="" className="w-4 rotate-180" />
+        </button>
+        <div className="relative shrink-0">
+          <img
+            src={selectedUser.profilePic || assets.avatar_icon}
+            alt=""
+            className={`w-9 h-9 rounded-full object-cover ${isSelectedUserOnline ? "ring-2 ring-green-400/70" : ""}`}
+          />
+          <span
+            className={`absolute bottom-0 right-0 w-3 h-3 rounded-full border-2 border-[#100b1f] ${
+              isSelectedUserOnline ? "bg-green-400" : "bg-gray-500"
+            }`}
+          ></span>
+        </div>
         <div className="flex-1 min-w-0">
-          <p className="text-lg text-white flex items-center gap-2 truncate">
+          <p className="text-base sm:text-lg text-white flex items-center gap-2 truncate">
             {selectedUser.fullName}
-            {onlineUsers.includes(selectedUser._id) && (
-              <span className="w-2 h-2 rounded-full bg-green-500"></span>
-            )}
           </p>
-          <p className="text-xs text-gray-400">
-            {onlineUsers.includes(selectedUser._id) ? "Online" : getLastSeenText()}
-            {isTyping && " · typing..."}
+          <p className={`text-xs flex items-center gap-1 ${isSelectedUserOnline ? "text-green-300" : "text-gray-400"}`}>
+            {isSelectedUserOnline && <span className="w-1.5 h-1.5 rounded-full bg-green-400 animate-pulse"></span>}
+            <span className="truncate">{isTyping ? "typing..." : isSelectedUserOnline ? "Online now" : getLastSeenText()}</span>
           </p>
         </div>
-        <button onClick={() => setShowSearch((value) => !value)} className="text-xs text-white bg-white/10 hover:bg-white/20 px-3 py-2 rounded-lg">
+        <button onClick={() => setShowSearch((value) => !value)} className="text-xs text-white bg-white/10 hover:bg-white/20 px-3 py-2 rounded-lg max-[380px]:px-2">
           Search
         </button>
         <button onClick={handleCopyTranscript} className="text-xs text-white bg-white/10 hover:bg-white/20 px-3 py-2 rounded-lg max-sm:hidden">
           Copy
         </button>
-        <button onClick={handleExportTranscript} className="text-xs text-white bg-violet-600/70 hover:bg-violet-600 px-3 py-2 rounded-lg">
+        <button onClick={handleExportTranscript} className="text-xs text-white bg-violet-600/70 hover:bg-violet-600 px-3 py-2 rounded-lg max-[380px]:px-2">
           Export
         </button>
-        <img onClick={() => setSelectedUser(null)} src={assets.help_icon} alt="" className="md:hidden max-w-5" />
         <img src={assets.help_icon} alt="" className="max-md:hidden max-w-5" />
       </div>
 

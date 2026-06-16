@@ -18,12 +18,19 @@ const Sidebar = () => {
   const { logout, onlineUsers } = useContext(AuthContext);
 
   const [input, setInput] = useState(false);
+  const [showMenu, setShowMenu] = useState(false);
 
   const filteredUsers = input ? users.filter((user)=>user.fullName.toLowerCase().includes(input.toLowerCase())) : users;
 
     useEffect(() => {
       getUsers();
     }, [onlineUsers])
+
+    useEffect(() => {
+      const closeMenu = () => setShowMenu(false);
+      window.addEventListener("click", closeMenu);
+      return () => window.removeEventListener("click", closeMenu);
+    }, []);
     
 
   const navigate = useNavigate();
@@ -36,24 +43,48 @@ const Sidebar = () => {
       <div className="pb-5">
         <div className="flex justify-between items-center">
           <img src={assets.logo} alt="logo" className="max-w-40" />
-          <div className="relative py-2 group">
-            <img
-              src={assets.menu_icon}
-              alt="Menu"
-              className="max-h-5 cursor-pointer"
-            />
-            <div className="absolute top-full right-0 z-20 w-32 p-5 rounded-md bg-[#282142] border-gray-600 text-gray-100 hidden group-hover:block">
+          <div className="relative py-2">
+            <button
+              type="button"
+              onClick={(e) => {
+                e.stopPropagation();
+                setShowMenu((value) => !value);
+              }}
+              className="w-9 h-9 flex items-center justify-center rounded-full hover:bg-white/10 active:bg-white/15"
+              aria-label="Open menu"
+            >
+              <img
+                src={assets.menu_icon}
+                alt="Menu"
+                className="max-h-5"
+              />
+            </button>
+            {showMenu && (
+            <div
+              onClick={(e) => e.stopPropagation()}
+              className="absolute top-full right-0 z-20 w-36 p-3 rounded-lg bg-[#282142] border border-white/10 text-gray-100 shadow-xl"
+            >
               <p
-                onClick={() => navigate("/profile")}
-                className="cursor-pointer text-sm"
+                onClick={() => {
+                  setShowMenu(false);
+                  navigate("/profile");
+                }}
+                className="cursor-pointer text-sm px-2 py-2 rounded hover:bg-white/10"
               >
                 Edit Profile
               </p>
               <hr className="my-2 border-t border-gray-500" />
-              <p onClick={() => logout()} className="cursor-pointer text-sm">
+              <p
+                onClick={() => {
+                  setShowMenu(false);
+                  logout();
+                }}
+                className="cursor-pointer text-sm px-2 py-2 rounded hover:bg-white/10"
+              >
                 Logout
               </p>
             </div>
+            )}
           </div>
         </div>
         {/* input field */}
@@ -85,7 +116,10 @@ const Sidebar = () => {
             <div className="flex flex-col leading-5">
               <p>{user.fullName}</p>
               {onlineUsers.includes(user._id) ? 
-                <span className="text-green-400 text-xs">Online</span>
+                <span className="text-green-300 text-xs flex items-center gap-1">
+                  <span className="w-2 h-2 rounded-full bg-green-400 shadow-[0_0_8px_rgba(74,222,128,0.8)]"></span>
+                  Online
+                </span>
                : 
                 <span className="text-neutral-400 text-xs">Offline</span>
               }
